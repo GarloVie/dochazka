@@ -1,11 +1,13 @@
-const C='dochazka-v3';
+const C='dochazka-v4';
 const CORE=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./apple-touch-icon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(CORE)));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))));self.clients.claim();});
 self.addEventListener('fetch',e=>{
  if(e.request.method!=='GET')return;
- const nav=e.request.mode==='navigate';
+ const u=new URL(e.request.url);
+ const fonts=u.hostname==='fonts.googleapis.com'||u.hostname==='fonts.gstatic.com';
+ if(u.origin!==self.location.origin&&!fonts)return; // kurzy apod. vždy čerstvé ze sítě
  const net=fetch(e.request).then(res=>{if(res&&(res.ok||res.type==='opaque')){const cp=res.clone();caches.open(C).then(c=>c.put(e.request,cp));}return res;});
- if(nav){e.respondWith(net.catch(()=>caches.match(e.request).then(r=>r||caches.match('./index.html'))));return;}
+ if(e.request.mode==='navigate'){e.respondWith(net.catch(()=>caches.match(e.request).then(r=>r||caches.match('./index.html'))));return;}
  e.respondWith(caches.match(e.request).then(r=>r||net));
 });

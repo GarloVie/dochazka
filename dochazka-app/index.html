@@ -15,7 +15,7 @@
 *{box-sizing:border-box;min-width:0}
 html,body{margin:0;height:100%}
 body{font:16px/1.4 Roboto,Arial,sans-serif;color:var(--ink);background:var(--ink);overflow-x:clip}
-button,input{font:inherit}
+button,input,textarea{font:inherit}
 button{cursor:pointer}
 :focus-visible{outline:3px solid var(--yel);outline-offset:-3px}
 .view{display:none;flex-direction:column;min-height:100dvh;max-width:560px;margin:0 auto;background:#fff}
@@ -202,7 +202,7 @@ textarea.inp{height:auto;min-height:150px;padding:10px 12px;line-height:1.45;res
   <div class="rcp"><div><small>PŘÍJEMCE</small><b id="xTo"></b></div><button id="xChange">ZMĚNIT</button></div>
   <footer class="ft">
     <button class="btn pri" id="xMail"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="3" y="5" width="18" height="14"/><polyline points="3 6 12 13 21 6"/></svg>ODESLAT E-MAILEM</button>
-    <span class="xnote" id="xNote">Text a příloha se vyplní samy. Adresu příjemce vložíte do pole Komu, aplikace ji zkopíruje.</span>
+    <span class="xnote" id="xNote">Otevře se e-mail s vyplněným příjemcem, předmětem i textem. Soubor připojíte v Gmailu přes kancelářskou sponku, najdete ho ve Stažených souborech.</span>
     <button class="btn wh" id="xDl">STÁHNOUT ZNOVU</button>
     <button class="btn wh back">ZPĚT NA MĚSÍC</button>
   </footer>
@@ -216,7 +216,7 @@ textarea.inp{height:auto;min-height:150px;padding:10px 12px;line-height:1.45;res
     <span aria-hidden="true"></span>
   </header>
   <div class="form" style="gap:18px">
-    <div><label class="lbl" for="pName">JMÉNO A PŘÍJMENÍ</label><input class="inp big" id="pName" autocomplete="name" placeholder="např. Petr Česnek" style="font-size:18px"><div class="hint" style="margin-top:6px">Propíše se do každé docházky a exportu, dokud ho tady nezměníte.</div></div>
+    <div><label class="lbl" for="pName">JMÉNO A PŘÍJMENÍ</label><input class="inp big" id="pName" autocomplete="name" placeholder="např. Petr Česnek" style="font-size:18px"></div>
     <div><label class="lbl" for="pMail">E-MAIL PRO ODESLÁNÍ DOCHÁZKY</label><input class="inp" id="pMail" type="email" placeholder="francova@eah.cz"></div>
     <div><label class="lbl" for="pWage">HODINOVÁ MZDA</label><div class="suf"><input id="pWage" inputmode="decimal" placeholder="0"><span>Kč/h</span></div></div>
     <div>
@@ -225,10 +225,8 @@ textarea.inp{height:auto;min-height:150px;padding:10px 12px;line-height:1.45;res
         <div><label class="hint" for="pEur">1 EUR =</label><div class="suf sm"><input id="pEur" inputmode="decimal" placeholder="25,00"><span>Kč</span></div></div>
         <div><label class="hint" for="pGbp">1 GBP =</label><div class="suf sm"><input id="pGbp" inputmode="decimal" placeholder="29,00"><span>Kč</span></div></div>
       </div>
-      <button class="btn out" id="pRate" style="margin-top:8px;border-color:var(--navy);color:var(--navy)">NAČÍST AKTUÁLNÍ KURZ ČNB</button>
-      <div class="hint" id="pRateInfo" style="margin-top:6px;font-size:12px">Kurz se mění, výdělek je proto jen orientační.</div>
+      <button class="btn out" id="pRate" style="margin-top:8px;border-color:var(--navy);color:var(--navy)">NAČÍST AKTUÁLNÍ KURZ</button>
     </div>
-    <div class="box"><small>JAK SE POČÍTÁ VÝDĚLEK</small><span class="f">mzda × (odpracováno − oběd) + diety × kurz + ostatní</span><span class="e" id="pEx"></span></div>
     <div><label class="lbl" for="pText">TEXT E-MAILU</label><textarea class="inp" id="pText"></textarea><div class="hint" style="margin-top:6px">Předmět: <span id="pSubj"></span></div></div>
     <div>
       <span class="lbl">ZÁLOHA DAT</span>
@@ -584,23 +582,12 @@ $('exp').addEventListener('click', async () => {
 });
 $('xDl').addEventListener('click', async () => { if (lastBlob) { const r = await deliver(lastBlob, fileName()); if (r === 'ok') toast('Soubor je ve Stažených souborech'); } });
 $('xChange').addEventListener('click', () => openProfile());
-$('xMail').addEventListener('click', async () => {
-  if (!lastBlob) return;
-  const to = st.profile.email || '';
-  let copied = false;
-  if (to) { try { await navigator.clipboard.writeText(to); copied = true; } catch (e) {} }
-  const file = new File([lastBlob], fileName(), {type:XMIME});
-  const data = {files:[file], title:subject(), text:mailText()};
-  try {
-    if (navigator.canShare && navigator.canShare({files:[file]})) {
-      await navigator.share(data);
-      if (copied) toast('Adresa ' + to + ' je zkopírovaná, vložte ji do pole Komu');
-      return;
-    }
-  } catch (e) { if (e.name === 'AbortError') return; }
-  // fallback: e-mail bez přílohy, soubor je ve Stažených
-  location.href = 'mailto:' + encodeURIComponent(to) + '?subject=' + encodeURIComponent(subject()) + '&body=' + encodeURIComponent(mailText());
-  toast('Přílohu přidejte ze Stažených souborů');
+$('xMail').addEventListener('click', () => {
+  const to = (st.profile.email || '').trim();
+  const body = mailText().replace(/\r?\n/g, '\r\n');
+  const href = 'mailto:' + to + '?subject=' + encodeURIComponent(subject()) + '&body=' + encodeURIComponent(body);
+  const a = document.createElement('a'); a.href = href; a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); a.remove();
 });
 
 /* ---------- profile ---------- */
@@ -608,21 +595,10 @@ function openProfile() {
   const p = st.profile;
   $('pName').value = p.name || ''; $('pMail').value = p.email || ''; $('pWage').value = p.wage || '';
   $('pEur').value = p.eur || ''; $('pGbp').value = p.gbp || ''; $('pText').value = p.text || DEF_TEXT;
-  $('pRateInfo').textContent = (p.rateDate ? 'Kurz ČNB ze dne ' + p.rateDate + '. ' : '') + 'Kurz se mění, výdělek je proto jen orientační.';
   profEx(); show('vProfile', true);
 }
 function readProfile() { return {name:$('pName').value.trim(), email:$('pMail').value.trim(), wage:$('pWage').value.trim(), eur:$('pEur').value.trim(), gbp:$('pGbp').value.trim(), text:$('pText').value || DEF_TEXT, rateDate:st.profile.rateDate || ''}; }
-function profEx() {
-  const p = readProfile(), t = totals(), w = num(p.wage) || 0, rE = num(p.eur) || 0, rG = num(p.gbp) || 0;
-  const parts2 = [nf(w, 2) + ' Kč × ' + fmtH(t.H)];
-  if (t.eur) parts2.push(nf(t.eur, 2) + ' € × ' + nf(rE, 2));
-  if (t.gbp) parts2.push(nf(t.gbp, 2) + ' £ × ' + nf(rG, 2));
-  if (t.O) parts2.push(nf(t.O, 2) + ' Kč');
-  const total = w * t.H + t.eur * rE + t.gbp * rG + t.O;
-  const [, m] = parts();
-  $('pEx').textContent = 'V ' + LOC[m - 1] + ': ' + parts2.join(' + ') + ' = ≈ ' + nf(total) + ' Kč';
-  $('pSubj').textContent = subject();
-}
+function profEx() { $('pSubj').textContent = subject(); }
 ['pName','pWage','pEur','pGbp'].forEach(id => $(id).addEventListener('input', profEx));
 $('toProfile').addEventListener('click', openProfile);
 $('pSave').addEventListener('click', () => {
@@ -630,21 +606,35 @@ $('pSave').addEventListener('click', () => {
   if (p.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.email)) { toast('E-mail nevypadá správně'); return; }
   st.profile = p; save(); goMonth(); setTimeout(() => toast('Profil uložen'), 50);
 });
-$('pRate').addEventListener('click', async () => {
-  $('pRate').disabled = true;
+async function getJSON(u) { const r = await fetch(u, {cache:'no-store'}); if (!r.ok) throw new Error(r.status); return r.json(); }
+async function loadRates() {
+  // 1) ČNB (oficiální API)
   try {
-    const r = await fetch('https://www.cnb.cz/cs/financni-trhy/devizovy-trh/kurzy-devizoveho-trhu/kurzy-devizoveho-trhu/denni_kurz.txt', {cache:'no-store'});
-    if (!r.ok) throw 0;
-    const txt = await r.text(), date = (txt.split('\n')[0] || '').split(' ')[0];
-    const pick = c => { const l = txt.split('\n').find(x => x.split('|')[3] === c); if (!l) return null; const f = l.split('|'); return (parseFloat(f[4].replace(',', '.')) / parseFloat(f[2])); };
-    const e = pick('EUR'), g = pick('GBP');
-    if (!e || !g) throw 0;
-    $('pEur').value = nf(e, 3); $('pGbp').value = nf(g, 3);
-    st.profile.rateDate = date;
-    $('pRateInfo').textContent = 'Kurz ČNB ze dne ' + date + '. Kurz se mění, výdělek je proto jen orientační.';
-    profEx(); toast('Kurz načten, nezapomeňte uložit profil');
-  } catch (e) { toast('Kurz se nepodařilo načíst, zadejte ho ručně'); }
-  $('pRate').disabled = false;
+    const j = await getJSON('https://api.cnb.cz/cnbapi/exrates/daily?lang=CZ');
+    const f = c => { const x = (j.rates || []).find(r => r.currencyCode === c); return x ? x.rate / x.amount : null; };
+    const e = f('EUR'), g = f('GBP');
+    if (e && g) return {e, g, src:'ČNB', date:(j.rates[0] && j.rates[0].validFor) || ''};
+  } catch (err) {}
+  // 2) Evropská centrální banka (Frankfurter)
+  try {
+    const j = await getJSON('https://api.frankfurter.app/latest?from=EUR&to=CZK,GBP');
+    if (j.rates && j.rates.CZK && j.rates.GBP) return {e:j.rates.CZK, g:j.rates.CZK / j.rates.GBP, src:'ECB', date:j.date || ''};
+  } catch (err) {}
+  // 3) záložní zdroj
+  const j = await getJSON('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json');
+  if (j.eur && j.eur.czk && j.eur.gbp) return {e:j.eur.czk, g:j.eur.czk / j.eur.gbp, src:'ECB/trh', date:j.date || ''};
+  throw new Error('no rates');
+}
+const czDate = d => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d || ''); return m ? (+m[3]) + '. ' + (+m[2]) + '. ' + m[1] : d; };
+$('pRate').addEventListener('click', async () => {
+  $('pRate').disabled = true; $('pRate').textContent = 'NAČÍTÁM…';
+  try {
+    const r = await loadRates();
+    $('pEur').value = nf(r.e, 3); $('pGbp').value = nf(r.g, 3);
+    st.profile.rateDate = czDate(r.date);
+    toast('Kurz ' + r.src + (r.date ? ' ze dne ' + czDate(r.date) : '') + ' načten, uložte profil');
+  } catch (e) { toast('Kurz se nepodařilo načíst, zkontrolujte připojení nebo ho zadejte ručně'); }
+  $('pRate').disabled = false; $('pRate').textContent = 'NAČÍST AKTUÁLNÍ KURZ';
 });
 
 /* ---------- backup ---------- */
